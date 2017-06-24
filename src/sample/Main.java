@@ -82,6 +82,7 @@ public class Main extends Application {
         Button updateButton = new Button("Azuriraj");
         updateButton.setMinWidth(175);
 
+        // top side---------------------------------------------------------------------------
         Label lerror2 = new Label("");
         Label lDatumPrijave = new Label("Datum Prijave:");
         TextField txtDatumPrijave = new TextField();
@@ -105,8 +106,11 @@ public class Main extends Application {
         TextField txtNastavnik = new TextField();
         Label lNapomena = new Label("Napomena:");
         TextField txtNapomena = new TextField();
-
-        // Columns for table
+        TextArea taIzvestaj =new TextArea();
+        Alert alert1 =new Alert(Alert.AlertType.ERROR, "OVDe ce ici izvestaj!\nOVDe ce ici izvestaj!\nOVDe ce ici izvestaj!\n" +
+                "                                                  OVDe ce ici izvestaj!\nOVDe ce ici izvestaj!\nOVDe ce ici izvestaj!\n");
+    //---------------------------------------------------------------------------------
+        // Columns for table------------------------------------------------------------
         TableColumn<Ispit,String> indeks = new TableColumn<>("indeks");
         TableColumn<Ispit,String> idPredmeta = new TableColumn<>("idPredmeta");
         TableColumn<Ispit,String> godinaRoka = new TableColumn<>("godinaRoka");
@@ -144,6 +148,7 @@ public class Main extends Application {
         ocena.setCellValueFactory(new PropertyValueFactory<>("ocena"));
         nastavnik.setCellValueFactory(new PropertyValueFactory<>("nastavnik"));
         napomena.setCellValueFactory(new PropertyValueFactory<>("napomena"));
+        //-------------------------------------------------------------------------------------------------------------
 
         table = new TableView<>();
         table.setItems(ispiti);
@@ -166,7 +171,7 @@ public class Main extends Application {
         HBox workGrid = new HBox();
         workGrid.setPadding(new Insets(10,10,10,10));
         workGrid.setSpacing(20);
-        workGrid.getChildren().addAll(labelgrid,txtgrid,buttonGrid2);
+        workGrid.getChildren().addAll(labelgrid,txtgrid,buttonGrid2,taIzvestaj);
 
         VBox loggrid = new VBox();
         loggrid.setPadding(new Insets(10,10,10,10));
@@ -301,6 +306,8 @@ public class Main extends Application {
                 System.out.println("Updated!");
                 baza.getConnection().commit();
                 ObservableList<Ispit> ispits =table.getItems();
+
+                //Update table na prozoru
                 for(Ispit i : ispits){
                     if(ispitforUpdate.indeks.equals(i.indeks) && ispitforUpdate.idPredmeta.equals(i.idPredmeta)
                             && ispitforUpdate.godinaRoka.equals(i.godinaRoka) && ispitforUpdate.oznakaRoka.equals(i.oznakaRoka)){
@@ -318,18 +325,60 @@ public class Main extends Application {
                         table.refresh();
                     }
                 }
+                // IZRADA IZVESTAJA------------------------------------------------------------------------------------------
+                taIzvestaj.clear();
+                String izvestajBuffer="";
+                for(int GODINA=2007 ; GODINA < 2017 ; GODINA++){
+                    izvestajBuffer = izvestajBuffer + "\n--------------|" +  GODINA  + "|---------------------------\n";
+                    String sqlQuery = "select ir.naziv,p.naziv,count(*) as prijavilo," +
+                            " sum(case when ocena > 5 then 1 else 0 end) as polozilo," +
+                            " sum(case when ocena > 5 then 1 else 0 end)*1.0*100.0/count(*)*1.0 as procenat," +
+                            " case when sum(case when ocena > 5 then 1 else 0 end)= 0 then 0 else avg(ocena*1.0) end as prosek" +
+                            " from ispitni_rok ir left outer join ispit i  on ir.oznaka=i.oznaka_roka and i.godina_roka=ir.godina" +
+                            " join predmet p on p.id_predmeta = i.id_predmeta" +
+                            " where ir.godina =" +  GODINA  +
+                            " group by ir.naziv,p.naziv";
+                    ResultSet rsI = null;
+                    PreparedStatement ps = null;
+                    try{
+                        ps = baza.getConnection().prepareStatement(sqlQuery, rs.HOLD_CURSORS_OVER_COMMIT);
+                        rsI = Database.otvoriKursor(ps);
+                        if(!rsI.next())
+                            continue;
+                        do{
+                            izvestajBuffer = izvestajBuffer + rsI.getString(1).trim() + "\t"
+                                                + rsI.getString(2).trim() + "\t"
+                                                + rsI.getString(3).trim() + "\t"
+                                                + rsI.getString(4).trim() + "\t"
+                                                + rsI.getString(5).trim().substring(0,4) + "%\t"
+                                                + rsI.getString(6).trim().substring(0,4) + "\n";
 
+                        }while(rsI.next());
+                        rsI.close();
+                        ps.close();
+                        taIzvestaj.setText(izvestajBuffer);
+                    }catch(SQLException sqle) {
+                        if (sqle.getErrorCode() == -911 || sqle.getErrorCode() == -913) {
+                            try {
+                                Database.obradiCekanje(rsI, baza.getConnection(), ps);
+                            } catch (SQLException sqle2) {
+                            }
+                            ;
+                        }
+                        System.out.println("sql error:" + sqle.getMessage());
+                    }
+                    }
 
-            }catch(SQLException sqle){
+                }catch(SQLException sqle){
 
-                if(sqle.getErrorCode() == -911 || sqle.getErrorCode() == -913){
-                    try{Database.obradiCekanjeUpdate(updateS,sqlupdate);}catch(SQLException sqle2){};
-                }
-                else if(sqle.getErrorCode() == -545 || sqle.getErrorCode()== -180){
+                    if(sqle.getErrorCode() == -911 || sqle.getErrorCode() == -913){
+                        try{Database.obradiCekanjeUpdate(updateS,sqlupdate);}catch(SQLException sqle2){};
+                    }
+                    else if(sqle.getErrorCode() == -545 || sqle.getErrorCode()== -180){
 
-                    Alert alert = new Alert(Alert.AlertType.ERROR, "Greska: Pokusavas da promenis podatke na nekonzistentan nacin! (" + sqle.getMessage() + ")!");
-                    alert.show();
-                }
+                        Alert alert = new Alert(Alert.AlertType.ERROR, "Greska: Pokusavas da promenis podatke na nekonzistentan nacin! (" + sqle.getMessage() + ")!");
+                        alert.show();
+                    }
                 System.out.println("sql error:" + sqle.getMessage());
             }
 
