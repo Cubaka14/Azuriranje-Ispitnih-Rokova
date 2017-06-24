@@ -12,6 +12,10 @@ public class Database {
     private int first = 0, last = 0, free = MAX_CON;
 
     private Database() {
+
+    }
+
+    public void konektujSe() {
         try {
             Class.forName("com.ibm.db2.jcc.DB2Driver");
             for (int i = 0; i < MAX_CON; i++) {
@@ -26,6 +30,18 @@ public class Database {
             e.printStackTrace();
         }
     }
+
+    public void diskonektujSe() {
+        try {
+            for (int i = 0; i < MAX_CON; i++)
+                bafer[i].close();
+            System.out.println("Database.class : Disconnection successful!");
+        } catch (SQLException e) {
+            e.printStackTrace();
+            System.out.println("Database.class : DISCONNECTION FAILED!");
+        }
+    }
+
 
     public static Database getInstance() {
         if (instance == null) {
@@ -52,8 +68,22 @@ public class Database {
         bafer[last] = con;
         last = (last + 1) % MAX_CON;
     }
+
     public static ResultSet otvoriKursor(PreparedStatement ps) throws SQLException {
         ResultSet rs = ps.executeQuery();
         return rs;
+    }
+
+    public static ResultSet obradiCekanje(ResultSet rs, Connection con, PreparedStatement ps) throws SQLException {
+        System.out.println("Objekat je zakljucan od strane druge transakcije! Sacekajte!");
+        con.rollback();
+        System.out.println("Rollback");
+        return otvoriKursor(ps);
+    }
+    public static void obradiCekanjeUpdate(Statement st,String sqlUpdateQuery) throws  SQLException{
+        System.out.println("Objekat je zakljucan od strane druge transakcije! Sacekajte!");
+        bafer[0].rollback();
+        System.out.println("Rollback");
+        st.executeUpdate(sqlUpdateQuery);
     }
 }
